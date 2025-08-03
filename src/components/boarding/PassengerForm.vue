@@ -1,9 +1,16 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useBoardingStore } from '~/stores/boarding'
+import { useBoardingStore } from '@/stores/boarding'
+
+type PassengerType = 'vip' | 'elderly' | 'regular' | 'standby'
 
 const store = useBoardingStore()
-const form = ref({
+const form = ref<{
+  name: string
+  type: PassengerType
+  seatPreference: string
+  vehicleId: string
+}>({
   name: '',
   type: 'regular',
   seatPreference: '',
@@ -11,10 +18,10 @@ const form = ref({
 })
 
 const passengerTypes = [
-  { value: 'vip', label: 'VIP' },
-  { value: 'elderly', label: 'Elderly' },
-  { value: 'regular', label: 'Regular' },
-  { value: 'standby', label: 'Standby' }
+  { value: 'vip' as PassengerType, label: 'VIP' },
+  { value: 'elderly' as PassengerType, label: 'Elderly' },
+  { value: 'regular' as PassengerType, label: 'Regular' },
+  { value: 'standby' as PassengerType, label: 'Standby' }
 ]
 
 const handleSubmit = async () => {

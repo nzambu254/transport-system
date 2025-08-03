@@ -1,4 +1,3 @@
-// utils/PriorityQueue.ts
 export interface PassengerPriority {
   id: string
   vehicleId: string
@@ -6,116 +5,65 @@ export interface PassengerPriority {
   type: 'vip' | 'elderly' | 'regular' | 'standby'
   arrivalTime: Date
   seatPreference?: string
+  status: 'waiting' | 'boarding' | 'boarded'
   boardingTime?: Date
-  status?: 'waiting' | 'boarding' | 'boarded'
   queuePosition: number
 }
 
-export class PriorityQueue<T extends PassengerPriority> {
-  private heap: T[];
-  private compare: (a: T, b: T) => number;
+export class PriorityQueue<T extends { queuePosition: number }> {
+  private items: T[] = []
 
-  constructor(compareFn: (a: T, b: T) => number) {
-    this.heap = [];
-    this.compare = compareFn;
-  }
-
-  private parent(i: number): number {
-    return Math.floor((i - 1) / 2);
-  }
-
-  private left(i: number): number {
-    return 2 * i + 1;
-  }
-
-  private right(i: number): number {
-    return 2 * i + 2;
-  }
-
-  private swap(i: number, j: number): void {
-    [this.heap[i], this.heap[j]] = [this.heap[j], this.heap[i]];
-  }
-
-  private heapifyUp(index: number): void {
-    while (index > 0 &&
-      this.compare(this.heap[index], this.heap[this.parent(index)]) < 0) {
-      this.swap(index, this.parent(index));
-      index = this.parent(index);
-    }
-  }
-
-  private heapifyDown(index: number): void {
-    let smallest = index;
-    const left = this.left(index);
-    const right = this.right(index);
-
-    if (left < this.heap.length && this.compare(this.heap[left], this.heap[smallest]) < 0) {
-      smallest = left;
-    }
-
-    if (right < this.heap.length && this.compare(this.heap[right], this.heap[smallest]) < 0) {
-      smallest = right;
-    }
-
-    if (smallest !== index) {
-      this.swap(index, smallest);
-      this.heapifyDown(smallest);
-    }
-  }
-
-  enqueue(item: T): void {
-    this.heap.push(item);
-    this.heapifyUp(this.heap.length - 1);
+  enqueue(item: T) {
+    this.items.push(item)
+    this.items.sort((a, b) => a.queuePosition - b.queuePosition)
   }
 
   dequeue(): T | undefined {
-    if (this.isEmpty()) return undefined;
-    const item = this.heap[0];
-    this.heap[0] = this.heap[this.heap.length - 1];
-    this.heap.pop();
-    if (!this.isEmpty()) {
-      this.heapifyDown(0);
-    }
-    return item;
+    return this.items.shift()
   }
 
   peek(): T | undefined {
-    return this.heap[0];
+    return this.items[0]
+  }
+
+  clear() {
+    this.items = []
   }
 
   size(): number {
-    return this.heap.length;
-  }
-
-  isEmpty(): boolean {
-    return this.size() === 0;
-  }
-
-  clear(): void {
-    this.heap = [];
+    return this.items.length
   }
 
   toArray(): T[] {
-    return [...this.heap].sort(this.compare);
+    return [...this.items]
+  }
+
+  // Find the index of an item that matches the predicate
+  findIndex(predicate: (item: T) => boolean): number {
+    return this.items.findIndex(predicate)
+  }
+
+  // Update an existing item at a given index by merging new data
+  update(index: number, newData: Partial<T>) {
+    if (index >= 0 && index < this.items.length) {
+      this.items[index] = { ...this.items[index], ...newData }
+      // Re-sort after update to maintain priority order
+      this.items.sort((a, b) => a.queuePosition - b.queuePosition)
+    }
+  }
+
+  // Helper method to find and update by predicate
+  findAndUpdate(predicate: (item: T) => boolean, newData: Partial<T>): boolean {
+    const index = this.findIndex(predicate)
+    if (index !== -1) {
+      this.update(index, newData)
+      return true
+    }
+    return false
   }
 }
 
-export function createPassengerQueue(): PriorityQueue<PassengerPriority> {
-  // Priority order: vip > elderly > regular > standby
-  // For same priority, earlier arrivalTime comes first
-  return new PriorityQueue<PassengerPriority>((a, b) => {
-    const priorityMap = { 'vip': 0, 'elderly': 1, 'regular': 2, 'standby': 3 };
-
-    // First compare by status
-    if (a.status === 'boarding') return -1;
-    if (b.status === 'boarding') return 1;
-
-    // Then compare by passenger type
-    if (priorityMap[a.type] !== priorityMap[b.type]) {
-      return priorityMap[a.type] - priorityMap[b.type];
-    }
-
-    // Finally compare by arrival time
-    return a.arrivalTime.getTime() - b.arrivalTime.getTime();
-  });
+// Factory function to create a PriorityQueue for PassengerPriority
+export function createPassengerQueue() {
+  return new PriorityQueue<PassengerPriority>()
 }

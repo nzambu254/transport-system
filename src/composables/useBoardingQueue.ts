@@ -1,30 +1,20 @@
-// composables/useBoardingQueue.ts
-import { ref, type Ref } from 'vue'
+import { ref } from 'vue'
 import { useSupabaseClient } from '#imports'
-import { PriorityQueue, PassengerPriority, createPassengerQueue } from '~/utils/PriorityQueue'
+import { createPassengerQueue, type PassengerPriority } from '~/utils/PriorityQueue'
 
 interface DatabasePassenger {
   id: string
   vehicle_id: string
   passenger_name: string
-  passenger_type: PassengerPriority['type']
+  passenger_type: 'vip' | 'elderly' | 'regular' | 'standby'
   arrival_time: string
-  boarding_time: string | null
-  seat_preference: string | null
-  status: NonNullable<PassengerPriority['status']>
-  queue_position: number | null
+  boarding_time?: string | null
+  seat_preference?: string | null
+  status: 'waiting' | 'boarding' | 'boarded'
+  queue_position?: number | null
 }
 
-interface BoardingQueueReturn {
-  queue: PriorityQueue<PassengerPriority>
-  loading: Ref<boolean>
-  error: Ref<string | null>
-  fetchPassengers: (vehicleId: string) => Promise<void>
-  addPassenger: (passenger: Omit<PassengerPriority, 'id' | 'queuePosition' | 'status'>) => Promise<DatabasePassenger | null>
-  boardPassenger: (passengerId: string) => Promise<DatabasePassenger | null>
-}
-
-export const useBoardingQueue = (): BoardingQueueReturn => {
+export const useBoardingQueue = () => {
   const supabase = useSupabaseClient()
   const queue = createPassengerQueue()
   const loading = ref(false)
@@ -53,22 +43,26 @@ export const useBoardingQueue = (): BoardingQueueReturn => {
           type: passenger.passenger_type,
           arrivalTime: new Date(passenger.arrival_time),
           boardingTime: passenger.boarding_time ? new Date(passenger.boarding_time) : undefined,
-          seatPreference: passenger.seat_preference || undefined,
-          status: passenger.status || 'waiting',
-          queuePosition: passenger.queue_position || 0
+          seatPreference: passenger.seat_preference ?? undefined,
+          status: passenger.status,
+          queuePosition: passenger.queue_position ?? queue.size() + 1
         })
       })
-    } catch (err: unknown) {
-      error.value = err instanceof Error ? err.message : 'Unknown error occurred'
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to fetch passengers'
     } finally {
       loading.value = false
     }
   }
 
-  const addPassenger = async (passenger: Omit<PassengerPriority, 'id' | 'queuePosition' | 'status'>): Promise<DatabasePassenger | null> => {
+  const addPassenger = async (
+    passenger: Omit<PassengerPriority, 'id' | 'queuePosition' | 'status'>
+  ) => {
     try {
       loading.value = true
       error.value = null
+
+      const queuePos = queue.size() + 1
 
       const { data, error: insertError } = await supabase
         .from('passenger_queue')
@@ -79,32 +73,31 @@ export const useBoardingQueue = (): BoardingQueueReturn => {
           arrival_time: passenger.arrivalTime.toISOString(),
           seat_preference: passenger.seatPreference,
           status: 'waiting',
-          queue_position: queue.size() + 1
+          queue_position: queuePos
         })
         .select()
         .single()
 
       if (insertError) throw insertError
 
-      const passengerWithId: PassengerPriority = {
+      const newPassenger: PassengerPriority = {
         ...passenger,
         id: data.id,
-        queuePosition: queue.size() + 1,
         status: 'waiting',
-        boardingTime: undefined
+        queuePosition: queuePos
       }
 
-      queue.enqueue(passengerWithId)
-      return data
-    } catch (err: unknown) {
-      error.value = err instanceof Error ? err.message : 'Unknown error occurred'
+      queue.enqueue(newPassenger)
+      return data.id
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to add passenger'
       return null
     } finally {
       loading.value = false
     }
   }
 
-  const boardPassenger = async (passengerId: string): Promise<DatabasePassenger | null> => {
+  const boardPassenger = async (passengerId: string) => {
     try {
       loading.value = true
       error.value = null
@@ -121,22 +114,18 @@ export const useBoardingQueue = (): BoardingQueueReturn => {
 
       if (updateError) throw updateError
 
-      // Update local queue state
-      const passengers = queue.toArray()
-      const index = passengers.findIndex(p => p.id === passengerId)
+      // FIX: Use traditional approach - find index then update
+      const index = queue.findIndex((p: PassengerPriority) => p.id === passengerId)
       if (index !== -1) {
-        passengers[index] = {
-          ...passengers[index],
-          status: 'boarding',
+        queue.update(index, {
+          status: 'boarding' as const,
           boardingTime: new Date()
-        }
-        queue.clear()
-        passengers.forEach(p => queue.enqueue(p))
+        })
       }
 
       return data
-    } catch (err: unknown) {
-      error.value = err instanceof Error ? err.message : 'Unknown error occurred'
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to board passenger'
       return null
     } finally {
       loading.value = false
