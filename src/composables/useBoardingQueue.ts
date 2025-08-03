@@ -114,13 +114,29 @@ export const useBoardingQueue = () => {
 
       if (updateError) throw updateError
 
-      // FIX: Use traditional approach - find index then update
-      const index = queue.findIndex((p: PassengerPriority) => p.id === passengerId)
-      if (index !== -1) {
-        queue.update(index, {
+      // Find and update the passenger in the queue
+      const queueArray = queue.toArray()
+      const passengerIndex = queueArray.findIndex((p: PassengerPriority) => p.id === passengerId)
+      
+      if (passengerIndex !== -1) {
+        // Remove the old passenger and add updated one
+        const updatedPassenger: PassengerPriority = {
+          ...queueArray[passengerIndex],
           status: 'boarding' as const,
           boardingTime: new Date()
+        }
+        
+        // Clear queue and re-add all passengers with the updated one
+        queue.clear()
+        queueArray.forEach((passenger, index) => {
+          if (index === passengerIndex) {
+            queue.enqueue(updatedPassenger)
+          } else {
+            queue.enqueue(passenger)
+          }
         })
+      } else {
+        console.warn(`Passenger with id ${passengerId} not found in queue`)
       }
 
       return data

@@ -13,7 +13,7 @@ export interface PassengerPriority {
 export class PriorityQueue<T extends { queuePosition: number }> {
   private items: T[] = []
 
-  enqueue(item: T) {
+  enqueue(item: T): void {
     this.items.push(item)
     this.items.sort((a, b) => a.queuePosition - b.queuePosition)
   }
@@ -26,7 +26,7 @@ export class PriorityQueue<T extends { queuePosition: number }> {
     return this.items[0]
   }
 
-  clear() {
+  clear(): void {
     this.items = []
   }
 
@@ -44,7 +44,7 @@ export class PriorityQueue<T extends { queuePosition: number }> {
   }
 
   // Update an existing item at a given index by merging new data
-  update(index: number, newData: Partial<T>) {
+  update(index: number, newData: Partial<T>): void {
     if (index >= 0 && index < this.items.length) {
       this.items[index] = { ...this.items[index], ...newData }
       // Re-sort after update to maintain priority order
@@ -64,6 +64,6 @@ export class PriorityQueue<T extends { queuePosition: number }> {
 }
 
 // Factory function to create a PriorityQueue for PassengerPriority
-export function createPassengerQueue() {
+export function createPassengerQueue(): PriorityQueue<PassengerPriority> {
   return new PriorityQueue<PassengerPriority>()
 }
