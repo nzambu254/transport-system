@@ -1,23 +1,24 @@
 <script setup lang="ts">
-import { useBoardingStore } from '~/stores/boarding';
+import { ref } from 'vue'
+import { useBoardingStore } from '~/stores/boarding'
 
-const store = useBoardingStore();
+const store = useBoardingStore()
 const form = ref({
   name: '',
   type: 'regular',
   seatPreference: '',
   vehicleId: ''
-});
+})
 
 const passengerTypes = [
   { value: 'vip', label: 'VIP' },
   { value: 'elderly', label: 'Elderly' },
   { value: 'regular', label: 'Regular' },
   { value: 'standby', label: 'Standby' }
-];
+]
 
 const handleSubmit = async () => {
-  if (!form.value.name || !store.currentVehicle) return;
+  if (!form.value.name || !store.currentVehicle) return
 
   await store.addPassenger({
     name: form.value.name,
@@ -25,11 +26,11 @@ const handleSubmit = async () => {
     seatPreference: form.value.seatPreference,
     arrivalTime: new Date(),
     vehicleId: store.currentVehicle
-  });
+  })
 
-  form.value.name = '';
-  form.value.seatPreference = '';
-};
+  form.value.name = ''
+  form.value.seatPreference = ''
+}
 </script>
 
 <template>

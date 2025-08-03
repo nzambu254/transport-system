@@ -7,17 +7,17 @@
 </template>
 
 <script setup lang="ts">
-// Initialize stores if needed
-const boardingStore = useBoardingStore();
+import { onMounted } from 'vue'
+import { useBoardingStore } from '@/stores/boarding' // Changed from ~ to @
 
-// You can add any global initialization logic here
+const boardingStore = useBoardingStore()
+
 onMounted(() => {
-  // Global mount logic if needed
-});
+  boardingStore.subscribeToUpdates()
+})
 </script>
 
 <style>
-/* Optional global styles */
 body {
   @apply bg-gray-50;
 }

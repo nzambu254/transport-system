@@ -1,11 +1,14 @@
-interface PassengerPriority {
+// utils/PriorityQueue.ts
+export interface PassengerPriority {
   id: string
+  vehicleId: string
   name: string
   type: 'vip' | 'elderly' | 'regular' | 'standby'
   arrivalTime: Date
   seatPreference?: string
   boardingTime?: Date
-  queuePosition?: number
+  status?: 'waiting' | 'boarding' | 'boarded'
+  queuePosition: number
 }
 
 export class PriorityQueue<T extends PassengerPriority> {
@@ -17,9 +20,17 @@ export class PriorityQueue<T extends PassengerPriority> {
     this.compare = compareFn;
   }
 
-  private parent(i: number): number { return Math.floor((i - 1) / 2); }
-  private left(i: number): number { return 2 * i + 1; }
-  private right(i: number): number { return 2 * i + 2; }
+  private parent(i: number): number {
+    return Math.floor((i - 1) / 2);
+  }
+
+  private left(i: number): number {
+    return 2 * i + 1;
+  }
+
+  private right(i: number): number {
+    return 2 * i + 2;
+  }
 
   private swap(i: number, j: number): void {
     [this.heap[i], this.heap[j]] = [this.heap[j], this.heap[i]];
@@ -62,7 +73,9 @@ export class PriorityQueue<T extends PassengerPriority> {
     const item = this.heap[0];
     this.heap[0] = this.heap[this.heap.length - 1];
     this.heap.pop();
-    this.heapifyDown(0);
+    if (!this.isEmpty()) {
+      this.heapifyDown(0);
+    }
     return item;
   }
 
@@ -78,8 +91,12 @@ export class PriorityQueue<T extends PassengerPriority> {
     return this.size() === 0;
   }
 
+  clear(): void {
+    this.heap = [];
+  }
+
   toArray(): T[] {
-    return [...this.heap];
+    return [...this.heap].sort(this.compare);
   }
 }
 
@@ -89,10 +106,16 @@ export function createPassengerQueue(): PriorityQueue<PassengerPriority> {
   return new PriorityQueue<PassengerPriority>((a, b) => {
     const priorityMap = { 'vip': 0, 'elderly': 1, 'regular': 2, 'standby': 3 };
 
+    // First compare by status
+    if (a.status === 'boarding') return -1;
+    if (b.status === 'boarding') return 1;
+
+    // Then compare by passenger type
     if (priorityMap[a.type] !== priorityMap[b.type]) {
       return priorityMap[a.type] - priorityMap[b.type];
     }
 
+    // Finally compare by arrival time
     return a.arrivalTime.getTime() - b.arrivalTime.getTime();
   });
 }

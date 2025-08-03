@@ -1,20 +1,17 @@
 import type { Config } from 'tailwindcss'
 
-export default {
+const config: Config = {
   content: [
-    './components/**/*.{js,vue,ts}',
-    './layouts/**/*.vue',
-    './pages/**/*.vue',
-    './plugins/**/*.{js,ts}',
+    './components/**/*.{vue,js,ts}',
+    './layouts/**/*.{vue,js,ts}',
+    './pages/**/*.{vue,js,ts}',
+    './app.vue',
     './nuxt.config.{js,ts}',
-    './app.vue'
   ],
   theme: {
-    extend: {
-      colors: {
-        // Your custom colors here
-      }
-    },
+    extend: {},
   },
   plugins: [],
-} satisfies Config
+}
+
+export default config

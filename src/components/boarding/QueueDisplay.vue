@@ -1,20 +1,24 @@
 <script setup lang="ts">
-import { useBoardingStore } from '~/stores/boarding';
+import { ref, computed } from 'vue'
+import { format } from 'date-fns'
+import { useBoardingStore } from '@/stores/boarding'
+import type { PassengerPriority } from '@/utils/PriorityQueue'
 
-const store = useBoardingStore();
+const store = useBoardingStore()
 
-const priorityColors = {
+type PassengerType = PassengerPriority['type']
+const priorityColors: Record<PassengerType, string> = {
   vip: 'bg-purple-500',
   elderly: 'bg-blue-500',
   regular: 'bg-green-500',
   standby: 'bg-gray-500'
-};
+} as const
 
 const boardNextPassenger = async () => {
   if (store.nextPassenger) {
-    await store.boardPassenger(store.nextPassenger.id);
+    await store.boardPassenger(store.nextPassenger.id)
   }
-};
+}
 </script>
 
 <template>
