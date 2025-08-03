@@ -1,31 +1,35 @@
 {
-  "name": "nuxt-app",
+  "name": "transport-system-assessment",
   "private": true,
-  "type": "module",
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
-  },
-  "dependencies": {
-    "@googlemaps/js-api-loader": "^1.16.10",
-    "@nuxt/ui": "^3.3.0",
-    "@nuxtjs/supabase": "^1.6.0",
-    "@pinia/nuxt": "^0.11.2",
-    "date-fns": "^4.1.0",
-    "nuxt": "^4.0.1",
-    "vue": "^3.5.18",
-    "vue-router": "^4.5.1"
+    "postinstall": "nuxt prepare",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "type-check": "nuxt typecheck"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.11",
-    "@types/node": "^24.1.0",
-    "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.6",
-    "supabase": "^2.33.9",
-    "vite-tsconfig-paths": "^5.1.4",
+    "@nuxt/devtools": "latest",
+    "@nuxt/eslint-config": "^0.2.0",
+    "@nuxt/ui": "^2.22.1",
+    "@nuxtjs/google-fonts": "^3.2.0",
+    "@nuxtjs/supabase": "^1.1.6",
+    "@pinia/nuxt": "^0.5.1",
+    "@types/google.maps": "^3.54.10",
+    "eslint": "^8.57.0",
+    "nuxt": "^3.8.0",
+    "typescript": "^5.2.2",
     "vue-tsc": "^3.0.5"
+  },
+  "dependencies": {
+    "@googlemaps/js-api-loader": "^1.16.2",
+    "@supabase/supabase-js": "^2.38.4",
+    "pinia": "^2.1.7"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

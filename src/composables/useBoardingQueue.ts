@@ -1,159 +1,362 @@
-import { ref } from 'vue'
-import { useSupabaseClient } from '#imports'
-import { createPassengerQueue, type PassengerPriority } from '~/utils/PriorityQueue'
+import { ref, computed, onMounted, onUnmounted, readonly } from 'vue'
+import { createClient } from '@supabase/supabase-js'
+import { PriorityQueue, PassengerPriority, createPassengerQueue, passengerComparator } from '~/utils/priorityQueue' // lowercase 'p'
 
-interface DatabasePassenger {
-  id: string
-  vehicle_id: string
-  passenger_name: string
-  passenger_type: 'vip' | 'elderly' | 'regular' | 'standby'
-  arrival_time: string
-  boarding_time?: string | null
-  seat_preference?: string | null
-  status: 'waiting' | 'boarding' | 'boarded'
-  queue_position?: number | null
+interface SeatAssignment {
+  seatNumber: string
+  passengerId: string
 }
 
-export const useBoardingQueue = () => {
-  const supabase = useSupabaseClient()
-  const queue = createPassengerQueue()
-  const loading = ref(false)
+export const useBoardingQueue = (vehicleId: string) => {
+  const supabase = createClient(
+    process.env.SUPABASE_URL || '',
+    process.env.SUPABASE_ANON_KEY || ''
+  )
+
+  // State
+  const queue = ref<PriorityQueue<PassengerPriority>>(createPassengerQueue())
+  const passengers = ref<PassengerPriority[]>([])
+  const isLoading = ref(false)
   const error = ref<string | null>(null)
+  const seatAssignments = ref<SeatAssignment[]>([])
+  const totalSeats = ref<number>(50) // Default vehicle capacity
 
-  const fetchPassengers = async (vehicleId: string) => {
+  // Realtime subscription
+  let subscription: any = null
+
+  // Computed
+  const queueSize = computed(() => queue.value.size())
+  const isEmpty = computed(() => queue.value.isEmpty())
+  const nextPassenger = computed(() => queue.value.peek())
+
+  const passengersByType = computed(() => {
+    const grouped = passengers.value.reduce(
+      (acc: Record<string, PassengerPriority[]>, passenger: PassengerPriority) => {
+        if (!acc[passenger.type]) acc[passenger.type] = []
+        acc[passenger.type].push(passenger)
+        return acc
+      },
+      {} as Record<string, PassengerPriority[]>
+    )
+
+    return {
+      vip: grouped.vip || [],
+      elderly: grouped.elderly || [],
+      regular: grouped.regular || [],
+      standby: grouped.standby || []
+    }
+  })
+
+  const availableSeats = computed(() => {
+    const assignedSeats = seatAssignments.value.map(a => a.seatNumber)
+    const allSeats = Array.from(
+      { length: totalSeats.value },
+      (_, i) => `${Math.floor(i / 4) + 1}${String.fromCharCode(65 + (i % 4))}`
+    )
+    return allSeats.filter(seat => !assignedSeats.includes(seat))
+  })
+
+  // Load passengers from database
+  const loadPassengers = async () => {
+    isLoading.value = true
+    error.value = null
+
     try {
-      loading.value = true
-      error.value = null
-
       const { data, error: fetchError } = await supabase
         .from('passenger_queue')
         .select('*')
         .eq('vehicle_id', vehicleId)
+        .eq('status', 'waiting')
         .order('arrival_time', { ascending: true })
 
       if (fetchError) throw fetchError
 
-      queue.clear()
+      // Clear and rebuild queue
+      queue.value.clear()
+      passengers.value = []
 
-      data?.forEach((passenger: DatabasePassenger) => {
-        queue.enqueue({
+      data.forEach((passenger: any) => {
+        const passengerData: PassengerPriority = {
           id: passenger.id,
-          vehicleId: passenger.vehicle_id,
           name: passenger.passenger_name,
           type: passenger.passenger_type,
           arrivalTime: new Date(passenger.arrival_time),
+          seatPreference: passenger.seat_preference,
           boardingTime: passenger.boarding_time ? new Date(passenger.boarding_time) : undefined,
-          seatPreference: passenger.seat_preference ?? undefined,
-          status: passenger.status,
-          queuePosition: passenger.queue_position ?? queue.size() + 1
-        })
+          queuePosition: passenger.queue_position,
+          status: passenger.status
+        }
+
+        queue.value.enqueue(passengerData)
+        passengers.value.push(passengerData)
       })
+
+      // Update queue positions
+      updateQueuePositions()
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to fetch passengers'
+      error.value = err instanceof Error ? err.message : 'Failed to load passengers'
     } finally {
-      loading.value = false
+      isLoading.value = false
     }
   }
 
-  const addPassenger = async (
-    passenger: Omit<PassengerPriority, 'id' | 'queuePosition' | 'status'>
-  ) => {
+  // Add passenger to queue
+  const addPassenger = async (passenger: Omit<PassengerPriority, 'id' | 'arrivalTime'>) => {
+    isLoading.value = true
+    error.value = null
+
     try {
-      loading.value = true
-      error.value = null
+      const newPassenger: PassengerPriority = {
+        id: crypto.randomUUID(),
+        arrivalTime: new Date(),
+        status: 'waiting',
+        ...passenger
+      }
 
-      const queuePos = queue.size() + 1
-
-      const { data, error: insertError } = await supabase
+      // Add to database
+      const { error: insertError } = await supabase
         .from('passenger_queue')
         .insert({
-          vehicle_id: passenger.vehicleId,
-          passenger_name: passenger.name,
-          passenger_type: passenger.type,
-          arrival_time: passenger.arrivalTime.toISOString(),
-          seat_preference: passenger.seatPreference,
-          status: 'waiting',
-          queue_position: queuePos
+          vehicle_id: vehicleId,
+          passenger_name: newPassenger.name,
+          passenger_type: newPassenger.type,
+          arrival_time: newPassenger.arrivalTime.toISOString(),
+          seat_preference: newPassenger.seatPreference,
+          status: 'waiting'
         })
-        .select()
-        .single()
 
       if (insertError) throw insertError
 
-      const newPassenger: PassengerPriority = {
-        ...passenger,
-        id: data.id,
-        status: 'waiting',
-        queuePosition: queuePos
-      }
+      // Add to local queue
+      queue.value.enqueue(newPassenger)
+      passengers.value.push(newPassenger)
 
-      queue.enqueue(newPassenger)
-      return data.id
+      // Update positions
+      updateQueuePositions()
+
+      // Assign seat if available
+      await assignSeat(newPassenger.id)
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to add passenger'
-      return null
     } finally {
-      loading.value = false
+      isLoading.value = false
     }
   }
 
-  const boardPassenger = async (passengerId: string) => {
-    try {
-      loading.value = true
-      error.value = null
+  // Board next passenger
+  const boardNextPassenger = async (): Promise<PassengerPriority | null> => {
+    const passenger = queue.value.dequeue()
+    if (!passenger) return null
 
-      const { data, error: updateError } = await supabase
+    isLoading.value = true
+    error.value = null
+
+    try {
+      // Update database
+      const { error: updateError } = await supabase
         .from('passenger_queue')
         .update({
           status: 'boarding',
           boarding_time: new Date().toISOString()
         })
-        .eq('id', passengerId)
-        .select()
-        .single()
+        .eq('id', passenger.id)
 
       if (updateError) throw updateError
 
-      // Find and update the passenger in the queue
-      const queueArray = queue.toArray()
-      const passengerIndex = queueArray.findIndex((p: PassengerPriority) => p.id === passengerId)
-      
-      if (passengerIndex !== -1) {
-        // Remove the old passenger and add updated one
-        const updatedPassenger: PassengerPriority = {
-          ...queueArray[passengerIndex],
-          status: 'boarding' as const,
-          boardingTime: new Date()
-        }
-        
-        // Clear queue and re-add all passengers with the updated one
-        queue.clear()
-        queueArray.forEach((passenger, index) => {
-          if (index === passengerIndex) {
-            queue.enqueue(updatedPassenger)
-          } else {
-            queue.enqueue(passenger)
-          }
-        })
-      } else {
-        console.warn(`Passenger with id ${passengerId} not found in queue`)
-      }
+      // Remove from local passengers array
+      passengers.value = passengers.value.filter((p: PassengerPriority) => p.id !== passenger.id)
 
-      return data
+      // Update queue positions
+      updateQueuePositions()
+
+      return { ...passenger, status: 'boarding', boardingTime: new Date() }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to board passenger'
+      // Re-add to queue if database update failed
+      queue.value.enqueue(passenger)
       return null
     } finally {
-      loading.value = false
+      isLoading.value = false
     }
   }
 
+  // Remove passenger from queue
+  const removePassenger = async (passengerId: string) => {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      // Update database
+      const { error: updateError } = await supabase
+        .from('passenger_queue')
+        .update({ status: 'cancelled' })
+        .eq('id', passengerId)
+
+      if (updateError) throw updateError
+
+      // Remove from local state
+      passengers.value = passengers.value.filter((p: PassengerPriority) => p.id !== passengerId)
+
+      // Rebuild queue
+      rebuildQueue()
+
+      // Remove seat assignment
+      seatAssignments.value = seatAssignments.value.filter(a => a.passengerId !== passengerId)
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to remove passenger'
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  // Smart seat assignment algorithm
+  const assignSeat = async (passengerId: string): Promise<string | null> => {
+    const passenger = passengers.value.find((p: PassengerPriority) => p.id === passengerId)
+    if (!passenger) return null
+
+    let assignedSeat: string | null = null
+
+    // Try to honor seat preference first
+    if (passenger.seatPreference && availableSeats.value.includes(passenger.seatPreference)) {
+      assignedSeat = passenger.seatPreference
+    } else {
+      // Assign based on passenger type priority
+      const available = availableSeats.value
+      if (available.length === 0) return null
+
+      switch (passenger.type) {
+        case 'vip':
+          assignedSeat = available.find(seat => seat.startsWith('1')) ||
+            available.find(seat => seat.startsWith('2')) ||
+            available[0]
+          break
+        case 'elderly':
+          assignedSeat = available.find(seat => seat.endsWith('A') || seat.endsWith('D')) || available[0]
+          break
+        case 'regular':
+          assignedSeat = available.find(seat => seat.endsWith('B') || seat.endsWith('C')) || available[0]
+          break
+        case 'standby':
+          assignedSeat = available[available.length - 1]
+          break
+        default:
+          assignedSeat = available[0]
+      }
+    }
+
+    if (assignedSeat) {
+      seatAssignments.value.push({
+        seatNumber: assignedSeat,
+        passengerId
+      })
+    }
+
+    return assignedSeat
+  }
+
+  // Update queue positions for all passengers
+  const updateQueuePositions = async () => {
+    const sortedPassengers = [...passengers.value].sort(passengerComparator)
+
+    for (let i = 0; i < sortedPassengers.length; i++) {
+      const passenger = sortedPassengers[i]
+      passenger.queuePosition = i + 1
+
+      // Update in database
+      await supabase
+        .from('passenger_queue')
+        .update({ queue_position: i + 1 })
+        .eq('id', passenger.id)
+    }
+  }
+
+  // Rebuild queue from current passengers
+  const rebuildQueue = () => {
+    queue.value.clear()
+    passengers.value.forEach((passenger: PassengerPriority) => {
+      queue.value.enqueue(passenger)
+    })
+    updateQueuePositions()
+  }
+
+  // Setup realtime subscription
+  const setupRealtimeSubscription = () => {
+    subscription = supabase
+      .channel(`boarding-queue-${vehicleId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'passenger_queue',
+        filter: `vehicle_id=eq.${vehicleId}`
+      }, () => {
+        // Reload passengers when changes occur
+        loadPassengers()
+      })
+      .subscribe()
+  }
+
+  // Cleanup subscription
+  const cleanup = () => {
+    if (subscription) {
+      supabase.removeChannel(subscription)
+      subscription = null
+    }
+  }
+
+  // Get passenger position in queue
+  const getPassengerPosition = (passengerId: string): number => {
+    const passenger = passengers.value.find((p: PassengerPriority) => p.id === passengerId)
+    return passenger?.queuePosition || -1
+  }
+
+  // Get estimated boarding time
+  const getEstimatedBoardingTime = (passengerId: string): Date | null => {
+    const position = getPassengerPosition(passengerId)
+    if (position === -1) return null
+
+    // Estimate 2 minutes per passenger ahead
+    const estimatedMinutes = (position - 1) * 2
+    const now = new Date()
+    return new Date(now.getTime() + estimatedMinutes * 60000)
+  }
+
+  // Lifecycle
+  onMounted(async () => {
+    await loadPassengers()
+    setupRealtimeSubscription()
+  })
+
+  onUnmounted(() => {
+    cleanup()
+  })
+
   return {
-    queue,
-    loading,
-    error,
-    fetchPassengers,
+    // State
+    queue: readonly(queue),
+    passengers: readonly(passengers),
+    isLoading: readonly(isLoading),
+    error: readonly(error),
+    seatAssignments: readonly(seatAssignments),
+
+    // Computed
+    queueSize,
+    isEmpty,
+    nextPassenger,
+    passengersByType,
+    availableSeats,
+
+    // Methods
+    loadPassengers,
     addPassenger,
-    boardPassenger
+    boardNextPassenger,
+    removePassenger,
+    assignSeat,
+    getPassengerPosition,
+    getEstimatedBoardingTime,
+
+    // Utils
+    updateQueuePositions,
+    rebuildQueue,
+    cleanup
   }
 }

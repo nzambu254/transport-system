@@ -5,6 +5,7 @@ import { useBoardingStore } from '@/stores/boarding'
 type PassengerType = 'vip' | 'elderly' | 'regular' | 'standby'
 
 const store = useBoardingStore()
+
 const form = ref<{
   name: string
   type: PassengerType

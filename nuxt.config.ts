@@ -1,98 +1,80 @@
-// nuxt.config.ts
-import { defineNuxtConfig } from 'nuxt/config'
-import { fileURLToPath } from 'url'
-import tsconfigPaths from 'vite-tsconfig-paths'
-
 export default defineNuxtConfig({
-  // Use 'src' directory
-  srcDir: 'src/',
+  devtools: { enabled: true },
 
-  // Aliases pointing to ./src
-  alias: {
-    '~': fileURLToPath(new URL('./src', import.meta.url)),
-    '@': fileURLToPath(new URL('./src', import.meta.url))
-  },
-
-  // Enable component auto-imports from ~/components
-  components: [
-    {
-      path: '~/components',
-      pathPrefix: false
-    }
-  ],
+  // CSS Framework
+  css: ['~/assets/css/tailwind.css'],
 
   // Modules
   modules: [
-    '@nuxt/ui',
+    ['@nuxt/ui', {
+      global: true,
+      icons: ['heroicons', 'simple-icons']
+    }],
     '@pinia/nuxt',
     '@nuxtjs/supabase',
-    '@nuxtjs/supabase'
+    '@nuxtjs/google-fonts'
   ],
 
-  // Supabase config
-  // @ts-ignore
+  // Supabase Configuration
   supabase: {
-    redirect: false,
-    url: process.env.SUPABASE_URL,
-    key: process.env.SUPABASE_KEY,
-    serviceKey: process.env.SUPABASE_SERVICE_KEY,
-    cookieOptions: {
-      maxAge: 60 * 60 * 8 // 8 hours
-    },
-    clientOptions: {
-      auth: {
-        flowType: 'pkce',
-        detectSessionInUrl: true,
-        persistSession: true,
-        autoRefreshToken: true
-      }
+    redirectOptions: {
+      login: '/auth/login',
+      callback: '/auth/confirm',
+      exclude: ['/', '/boarding/queue']
     }
   },
 
-  // UI module config
-  ui: {
-    icons: ['mdi', 'heroicons']
-  },
-
-  // Runtime public config
+  // Runtime Config
   runtimeConfig: {
     public: {
-      googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
       supabaseUrl: process.env.SUPABASE_URL,
-      supabaseKey: process.env.SUPABASE_KEY
+      supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+      googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY
     }
   },
 
-  // TypeScript config
+  // Google Fonts
+  googleFonts: {
+    families: {
+      Inter: [400, 500, 600, 700]
+    }
+  },
+
+  // TypeScript Configuration
   typescript: {
-    typeCheck: true,
     strict: true,
-    tsConfig: {
-      compilerOptions: {
-        types: ['@nuxtjs/supabase']
-      }
-    }
+    typeCheck: true
   },
 
-
-  // Build config
+  // Build Configuration
   build: {
     transpile: ['@googlemaps/js-api-loader']
   },
 
-  // Vite config
-  vite: {
-    optimizeDeps: {
-      include: ['date-fns']
-    },
-    plugins: [
-      tsconfigPaths()
-    ]
+  // App Configuration
+  app: {
+    head: {
+      title: 'Transport System - Priority Queue Boarding',
+      meta: [
+        { charset: 'utf-8' },
+        { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+        { name: 'description', content: 'Advanced transport system with priority queue-based passenger boarding' }
+      ]
+    }
   },
 
-  // Compatibility date for Nuxt
-  compatibilityDate: '2025-07-15',
+  // Nitro Configuration for better performance
+  nitro: {
+    experimental: {
+      wasm: true
+    }
+  },
 
-  // Enable Nuxt Devtools
-  devtools: { enabled: true }
+  // Auto-imports
+  imports: {
+    dirs: [
+      'composables/**',
+      'utils/**'
+    ]
+  }
 })
