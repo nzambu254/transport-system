@@ -1,7 +1,7 @@
 // src/stores/boarding.ts
 import { defineStore } from 'pinia'
 
-export const useBoardingStore = defineStore('boarding', {
+export const  useBoardingQueueStore = defineStore('boarding', {
   state: () => ({
     passengers: [] as any[],
     loading: false,

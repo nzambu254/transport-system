@@ -1,30 +1,31 @@
+// nuxt.config.ts
 export default defineNuxtConfig({
+
   devtools: { enabled: true },
 
-  // CSS Framework
   css: ['~/assets/css/tailwind.css'],
 
-  // Modules
   modules: [
     ['@nuxt/ui', {
       global: true,
       icons: ['heroicons', 'simple-icons']
     }],
     '@pinia/nuxt',
-    '@nuxtjs/supabase',
-    '@nuxtjs/google-fonts'
+    ['@nuxtjs/supabase', {
+      redirectOptions: {
+        login: '/auth/login',
+        callback: '/auth/confirm',
+        exclude: ['/', '/boarding/queue']
+      }
+    }],
+    ['@nuxtjs/google-fonts', {
+      families: {
+        Inter: [400, 500, 600, 700]
+      }
+    }],
+    '@nuxtjs/tailwindcss',
   ],
 
-  // Supabase Configuration
-  supabase: {
-    redirectOptions: {
-      login: '/auth/login',
-      callback: '/auth/confirm',
-      exclude: ['/', '/boarding/queue']
-    }
-  },
-
-  // Runtime Config
   runtimeConfig: {
     public: {
       supabaseUrl: process.env.SUPABASE_URL,
@@ -33,25 +34,15 @@ export default defineNuxtConfig({
     }
   },
 
-  // Google Fonts
-  googleFonts: {
-    families: {
-      Inter: [400, 500, 600, 700]
-    }
-  },
-
-  // TypeScript Configuration
   typescript: {
     strict: true,
     typeCheck: true
   },
 
-  // Build Configuration
   build: {
     transpile: ['@googlemaps/js-api-loader']
   },
 
-  // App Configuration
   app: {
     head: {
       title: 'Transport System - Priority Queue Boarding',
@@ -63,18 +54,28 @@ export default defineNuxtConfig({
     }
   },
 
-  // Nitro Configuration for better performance
   nitro: {
     experimental: {
       wasm: true
     }
   },
 
-  // Auto-imports
   imports: {
     dirs: [
       'composables/**',
       'utils/**'
     ]
+  },
+
+  components: [
+    {
+      path: '~/components',
+      pathPrefix: false,
+    }
+  ],
+
+  experimental: {
+    payloadExtraction: false,
+    typedPages: true
   }
 })

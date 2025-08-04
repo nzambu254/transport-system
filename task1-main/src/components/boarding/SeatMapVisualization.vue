@@ -104,8 +104,18 @@
 
 <script setup lang="ts">
 import { computed, defineEmits } from 'vue'
-import type { PassengerPriority } from '~/utils/priorityQueue'  // Corrected import path here
 import SeatButton from './SeatButton.vue'
+
+// Define the passenger priority type locally
+type PassengerType = 'vip' | 'elderly' | 'regular' | 'standby'
+
+interface PassengerPriority {
+  id: string
+  name: string
+  type: PassengerType
+  arrivalTime: Date
+  seatPreference?: string
+}
 
 // Props
 interface Props {
@@ -157,14 +167,12 @@ const getSeatStatus = (seatNumber: string): 'available' | 'assigned' | 'vip' | '
   
   if (passenger.type === 'vip') return 'vip'
   if (passenger.type === 'elderly') return 'elderly'
-  
   return 'assigned'
 }
 
 const getPassengerForSeat = (seatNumber: string): PassengerPriority | undefined => {
   const assignment = props.seatAssignments.find(a => a.seatNumber === seatNumber)
   if (!assignment) return undefined
-  
   return props.passengers.find(p => p.id === assignment.passengerId)
 }
 

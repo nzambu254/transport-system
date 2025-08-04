@@ -5,9 +5,9 @@
     "moduleResolution": "node16",
     "baseUrl": ".",
     "paths": {
-      "~/*": ["./*"],
-      "@/*": ["./src/*"]
-    },
+  "~/*": ["./src/*"],
+  "@/*": ["./src/*"]
+  },
     "types": ["@types/node", "nuxt"],
     "allowJs": true,
     "strict": true,

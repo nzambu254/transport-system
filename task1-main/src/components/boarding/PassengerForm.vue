@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useBoardingStore } from '@/stores/boarding'
+import {  useBoardingQueueStore } from '@/stores/boarding'
 
 type PassengerType = 'vip' | 'elderly' | 'regular' | 'standby'
 
-const store = useBoardingStore()
+const store =  useBoardingQueueStore()
 
 const form = ref<{
   name: string
